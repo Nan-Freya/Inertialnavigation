@@ -1,1 +1,358 @@
+clc
+clear 
+close
 
+load('ex02_task1.mat','sixpos')
+
+% Assumptions
+phi = 52.385828; %Latitude in degree
+w_e_ref = 7.292115467*10^-5; %reference Earth rotation in rad/s
+g_ref = 9.811117;
+
+
+% Mean of rotation rate from the given dataset in rad/s 
+wx_down = sixpos.omx_down;
+wy_down = sixpos.omy_down;
+wz_down = sixpos.omz_down;
+wx_up = sixpos.omx_up;
+wy_up = sixpos.omy_up;
+wz_up = sixpos.omz_up;
+wb_ib_down_average = [mean(wx_down );
+                      mean(wy_down);
+                      mean(wz_down)];
+
+wb_ib_up_average = [mean(wx_up);
+                    mean(wy_up);
+                    mean(wz_up)];
+
+% Mean of specific force from the given dataset in m/s^2
+fx_down = sixpos.fx_down;
+fy_down = sixpos.fy_down;
+fz_down = sixpos.fz_down;
+fx_up = sixpos.fx_up;
+fy_up = sixpos.fy_up;
+fz_up = sixpos.fz_up;
+
+fb_ib_down_average = [mean(fx_down);
+                      mean(fy_down);
+                      mean(fz_down)];    
+                 
+fb_ib_up_average = [mean(fx_up);
+                    mean(fy_up);
+                    mean(fz_up)];
+
+                
+% Aufgabe 1:Deterministic effects    
+ % Bias and scale factor for the accelerometer
+b_a = (fb_ib_down_average + fb_ib_up_average)/2;
+s_a = (fb_ib_down_average - fb_ib_up_average)/(2*g_ref);
+
+ % Bias and scale factor for the gyro
+b_g = (wb_ib_down_average + wb_ib_up_average)/2;
+s_g = (wb_ib_down_average - wb_ib_up_average)/(2*w_e_ref*sind(phi));
+
+tau = 1/500;
+t = [1:length(wx_up)]*tau;
+figure(1)
+plot(t,wx_up)
+
+
+% Aufgabe 2:Stochastic effects
+clc
+clear
+close all
+load('ex02_task2.mat')
+
+a = sim_processes.a;
+b = sim_processes.b;
+c = sim_processes.c;
+d = sim_processes.d;
+
+% a)the respective timeporal differentiation in firster and second ord
+a_diff1=diff(a);
+a_diff2=diff(a_diff1);
+b_diff1=diff(b);
+b_diff2=diff(b_diff1);
+c_diff1=diff(c);
+c_diff2=diff(c_diff1);
+d_diff1=diff(d);
+d_diff2=diff(d_diff1);
+
+figure(1)
+subplot(3,1,1)
+plot(1:length(a), a)
+ylabel('a')
+title('original and timeporal differentiation in firster and second ord')
+subplot(3,1,2)
+plot(1:length(a_diff1), a_diff1)
+ylabel('a-diff1')
+subplot(3,1,3)
+plot(1:length(a_diff2), a_diff2)
+ylabel('a-diff2')
+xlabel('time[s]')
+
+figure(2)
+subplot(3,1,1)
+plot(1:length(b), b)
+ylabel('b')
+title('original and timeporal differentiation in firster and second ord')
+subplot(3,1,2)
+plot(1:length(b_diff1), b_diff1)
+ylabel('b-diff1')
+subplot(3,1,3)
+plot(1:length(b_diff2), b_diff2)
+ylabel('b-diff2')
+xlabel('time[s]')
+
+figure(3)
+subplot(3,1,1)
+plot(1:length(c), c)
+ylabel('c')
+title('original and timeporal differentiation in firster and second ord')
+subplot(3,1,2)
+plot(1:length(c_diff1), c_diff1)
+ylabel('c-diff1')
+subplot(3,1,3)
+plot(1:length(c_diff2), c_diff2)
+ylabel('c-diff2')
+xlabel('time[s]')
+
+figure(4)
+subplot(3,1,1)
+plot(1:length(d), d)
+ylabel('d')
+title('original and timeporal differentiation in firster and second ord')
+subplot(3,1,2)
+plot(1:length(d_diff1), d_diff1)
+ylabel('d-diff1')
+subplot(3,1,3)
+plot(1:length(d_diff2), d_diff2)
+ylabel('d-diff2')
+xlabel('time[s]')
+
+
+% b)Compute the Allan-Deviation for all processes 
+f = 100;  %Frequenz
+t_0 = 1/f;  %Averaging interval/sampling rate
+
+[a_ALD,t_a] = get_Allan_Deviation(a,t_0);
+[b_ALD,t_b] = get_Allan_Deviation(b,t_0);
+[c_ALD,t_c] = get_Allan_Deviation(c,t_0);
+[d_ALD,t_d] = get_Allan_Deviation(d,t_0);
+
+
+
+figure(5)
+loglog(t_a,a_ALD,t_b,b_ALD,t_c,c_ALD,t_d,d_ALD)
+xlabel('time[s]')
+ylabel('Allan Deviation')
+legend('a-ALD','b-ALD','c-ALD','d-ALD')
+title('Allan-Deviation Verlauf')
+
+% c)the sum process (a+b+c+d) 
+e = a+b+c+d;
+[e_ALD,t_e] = get_Allan_Deviation(e,t_0);
+e_Variance = e_ALD.^2;
+
+figure(6)
+plot(1:length(e), e)
+ylabel('e')
+xlabel('time[s]')
+title('sum process e(a+b+c+d)')
+
+figure(7)
+loglog(t_e,e_ALD)
+xlabel('t[s]')
+ylabel('Allan Deviation')
+title('sum process (a+b+c+d)')
+
+
+
+%% Aufgabe3
+clc
+clear
+close all
+
+load('ex02_task3.mat','imudata')
+
+
+% rotation rate from the given IMU dataset in rad/s 
+w_x= imudata(:,2);
+w_y= imudata(:,3);
+w_z= imudata(:,4);
+
+%specific force from the given IMU dataset in m/s^2
+f_x= imudata(:,5);
+f_y= imudata(:,6);
+f_z= imudata(:,7);
+
+
+% a)the raw data of your IMU over time
+time = imudata(:,1)-imudata(1,1); %Time in s (Anfang von 0) 
+
+figure(1)
+subplot(3,1,1)
+plot(time, w_x)
+ylabel('w_x[rad/s]')
+title('raw rotation rate of IMU over time')
+
+subplot(3,1,2)
+plot(time, w_y)
+ylabel('w_y[rad/s]')
+
+subplot(3,1,3)
+plot(time, w_z)
+ylabel('w_z[rad/s]')
+xlabel('time[s]')
+
+figure(2)
+subplot(3,1,1)
+plot(time, f_x)
+ylabel('f_x[m/s^2]')
+title(' raw specific force of IMU over time')
+
+subplot(3,1,2)
+plot(time, f_y)
+ylabel('f_y[m/s^2]')
+
+subplot(3,1,3)
+plot(time, f_z)
+ylabel('f_z[m/s^2]')
+xlabel('time[s]')
+
+
+% b)Estimate the Allan-deviation for 6 Achse
+f = 10;  %Frequenz
+t_0 = 1/f;  %Averaging interval/sampling rate
+
+[w_x_ALD,t_w_x] = get_Allan_Deviation(w_x,t_0);
+[w_y_ALD,t_w_y] = get_Allan_Deviation(w_y,t_0);
+[w_z_ALD,t_w_z] = get_Allan_Deviation(w_z,t_0);
+[f_x_ALD,t_f_x] = get_Allan_Deviation(f_x,t_0);
+[f_y_ALD,t_f_y] = get_Allan_Deviation(f_y,t_0);
+[f_z_ALD,t_f_z] = get_Allan_Deviation(f_z,t_0);
+[sigma, tau, Err] = avar(f_z,t_0);
+
+figure(3)
+loglog(t_w_x,w_x_ALD,t_w_y,w_y_ALD,t_w_z,w_z_ALD)
+xlabel('time[s]')
+ylabel('Allan Deviation')
+legend('wx','wy','wz')
+title('Allan-Deviation Verlauf for gyro')
+
+figure(4)
+loglog(t_f_x,f_x_ALD,t_f_y,f_y_ALD,t_f_z,f_z_ALD)
+xlabel('time[s]')
+ylabel('Allan Deviation')
+legend('fx','fy','fz')
+title('Allan-Deviation Verlauf for accelometer')
+
+figure(5)
+loglog(t_f_z,f_z_ALD,tau,sigma)
+xlabel('time[s]')
+ylabel('Allan Deviation')
+legend('fx','fy','fz')
+title('Allan-Deviation Verlauf for accelometer')
+
+
+%% Aufgabe 4
+clc
+clear
+close all
+
+load('ex02_task3.mat','imudata')
+
+% rotation rate from the given IMU dataset in rad/s 
+w_z= imudata(:,4);
+
+%specific force from the given IMU dataset in m/s^2
+f_z= imudata(:,7);
+
+
+% a)the analytical power spectral density of all different processes
+fs = 10;  %Frequenz
+
+fz_h_0 = 8.3845*10^-6;
+fz_h_1 = 5.2590*10^-8;
+fz_h_2 = 5.2590*10^-11;
+
+wz_h_0 = 9.7841*10^-8;
+wz_h_1 = 2.5349*10^-10;
+wz_h_2 = 0;
+
+
+% b)directly from the raw sensor data by FFT
+[freqw_z, psdw_z] = aux_calcPSD(w_z, fs);
+[freqf_z, psdf_z] = aux_calcPSD(f_z, fs);
+
+S_fz = fz_h_2 *freqf_z.^(-2) + fz_h_1*freqf_z.^(-1) + fz_h_0;
+S_wz = wz_h_2 *freqw_z.^(-2) + wz_h_1*freqw_z.^(-1) + wz_h_0;
+
+figure(1)
+loglog(freqw_z,psdw_z,freqw_z,S_wz)
+xlabel('frequency[HZ]')
+ylabel('P(f)')
+legend('direct FFT','Sy(f) via Allan')
+title('Single side Amplitude of w_z')
+
+figure(2)
+loglog(freqf_z,psdf_z,freqf_z,S_fz)
+xlabel('frequency[HZ]')
+ylabel('P(f)')
+legend('direct FFT','Sy(f) via Allan')
+title('Single side Amplitude of f_z')
+
+
+%% %%%%%Funktionteile%%%%%%%
+% Compute Allan Variance on an input signal
+function [Allan_Deviation,t] = get_Allan_Deviation(y,t_0)
+
+N = length(y);  %Total count of frequency measurements
+v = 6; %Minmal count of interval
+Nmax = floor(N/v); %Maximal count of frequency measurements in an interval
+
+for k = 1:Nmax   %k element in a interval
+    
+    clear y_average;
+    
+    j=1;
+    for i = 1:k:N-k
+        y_average(j) = mean(y(i:i+k-1)); %average value for M interval
+        j=j+1; 
+    end
+    
+    M = length(y_average);  % M interval
+    y_diff = diff(y_average); % All Differenz y(i+1)-y(i) (M-1 element)
+    sum = y_diff * y_diff';  % Sum of all Quadrat of Differenz
+        
+    Allan_Variance(k) = 1/(2*(M-1))*sum; %Allan Variance (k element)
+end
+
+Allan_Deviation = sqrt(Allan_Variance); %Allan Deviation (k element)
+t = [1:length(Allan_Deviation)]*t_0; %Time tao in s (k element)
+end
+
+
+
+
+
+function [freq, psdx] = aux_calcPSD(x, fs)
+%https://de.mathworks.com/help/signal/ug/power-spectral-density-estimates-using-fft.html
+%
+% INPUT: 
+%   o x - time series
+%   o fs - sensor frequency
+%
+% OUPUT:
+%   o freq - sampled frequencies
+%   o psdx - power spectral density
+
+N = length(x);
+xdft = fft(x);
+xdft = xdft(1:N/2+1);
+psdx = (1/(fs*N)) * abs(xdft).^2;
+psdx(2:end-1) = 2*psdx(2:end-1) ;
+
+freq = 0:fs/length(xdft):fs;
+freq=freq(1:length(psdx));
+end
