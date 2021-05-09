@@ -304,7 +304,7 @@ title('Single side Amplitude of f_z')
 
 
 %% %%%%%Funktionteile%%%%%%%
-% Compute Allan Variance on an input signal
+%% Compute Allan Variance on an input signal
 function [Allan_Deviation,t] = get_Allan_Deviation(y,t_0)
 
 N = length(y);  %Total count of frequency measurements
@@ -334,8 +334,7 @@ end
 
 
 
-
-
+%% PSD
 function [freq, psdx] = aux_calcPSD(x, fs)
 %https://de.mathworks.com/help/signal/ug/power-spectral-density-estimates-using-fft.html
 %
