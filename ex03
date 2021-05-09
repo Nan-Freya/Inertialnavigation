@@ -130,7 +130,7 @@ xlabel('time [s]')
 
 %% %%Funktionteile%%%%
 
-%Direkt Rotationmatrix aus raw IMU
+%% Direkt Rotationmatrix aus raw IMU
 function Cb_n_direkt=get_Cb_n_direkt(wb_ib,fb_ib,wn_ie,g_n)
   A1 = [fb_ib, wb_ib, cross(fb_ib,wb_ib)]; %eqution link
   B1 = [-g_n,  wn_ie, cross(-g_n,wn_ie)]; %eqution right
@@ -156,7 +156,7 @@ function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
 end
 
 
-%Euler Angels in degree aus DCM von n bis b 
+%% Euler Angels in degree aus DCM von n bis b 
 function Eulerwinkel = get_Eulerwinkel_aus_Cb_n(Cb_n)
   %Euler Angels in degree
   %DCM von n bis b 
@@ -169,7 +169,7 @@ function Eulerwinkel = get_Eulerwinkel_aus_Cb_n(Cb_n)
 end
 
 
-% Euler Angels in degree aus statisch IMU
+%% Euler Angels in degree aus statisch IMU
 function [roll,pitch,yaw]=get_Eulerwinkel_aus_IMU(wb_ib_average,fb_ib_average)
   w_x = wb_ib_average(1,1);
   w_y = wb_ib_average(2,1);
@@ -188,7 +188,7 @@ function [roll,pitch,yaw]=get_Eulerwinkel_aus_IMU(wb_ib_average,fb_ib_average)
 end
 
 
-%Reorthogonalization nach  Minimierung der Spur
+%% Reorthogonalization nach  Minimierung der Spur
 function Cb_n_reort=get_Reorthogonal(Cb_n_direkt)
   if Cb_n_direkt*Cb_n_direkt' == eye %Check orthogonal
       Cb_n_reort=Cb_n_direkt;
@@ -199,13 +199,13 @@ function Cb_n_reort=get_Reorthogonal(Cb_n_direkt)
 end
 
 
-% Bescleunigung
+%% Bescleunigung
 function an_eb = get_Beschleunigung(Cn_b,fb_ib,vn_eb,wn_ie,wn_en,g_n)
   an_eb = Cn_b*fb_ib - cross(2*wn_ie+wn_en,vn_eb) + g_n;
 end
 
 
-% wn_en
+%% wn_en
 function wn_en = get_wn_en(vn_eb,phi)
 
   vn_eb_N = vn_eb (1,1); 
@@ -221,7 +221,7 @@ end
 
 
 
-% Aufgabe 2: Attitude,velocity and  position  update
+%% Aufgabe 2: Attitude,velocity and  position  update
 function [Eulerwinkel,v,x,w] = get_Update(time,fs,wb_ib,fb_ib,Cb_n,vn_eb,xn_eb,wn_ie,phi,g_n)
 
 k = 200/fs; %Intervall
