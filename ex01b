@@ -1,1 +1,83 @@
+clc
+clear
+close all
+
+load('mustrain.mat', 'imudata')
+
+% Mean of rotation rate from the given IMU dataset in rad/s 
+w_x= imudata(:,2);
+w_y= imudata(:,3);
+w_z= imudata(:,4);
+w_x_average = mean(w_x);
+w_y_average = mean(w_y);
+w_z_average = mean(w_z);
+wb_ib_average = [w_x_average;
+                 w_y_average;
+                 w_z_average];
+wb_ib = [w_x,w_y,w_z]';
+w_e= norm(wb_ib_average);  %Earth rotation rate in rad/s
+
+% Mean of specific force from the given IMU dataset in m/s^2
+f_x= imudata(:,5);
+f_y= imudata(:,6);
+f_z= imudata(:,7);
+f_x_average= mean(f_x);
+f_y_average= mean(f_y);
+f_z_average= mean(f_z);
+fb_ib_average= [f_x_average;
+                f_y_average;
+                f_z_average];
+fb_ib= [f_x,f_y,f_z]';
+g= norm(fb_ib_average);
+
+
+% Aufgabe 1:Intial Alignment - Euler Angels in degree
+[roll,pitch,yaw] = get_Eulerwinkel(f_x_average,f_y_average,f_z_average,w_x_average,w_y_average); %Eulerwinkel aus IMU
+Cb_n_Euler = get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw); %DCM von n bis b aus Eulerwinkel
+Cn_b_Euler = Cb_n_Euler'; %DCM von b bis n aus Eulerwinkel
+
+
+%Aufgabe 2: Rotation Vector
+[u, rotation_angel] = get_Rotationsvector(Cb_n_Euler);
+
+
+%Aufgabe 3: Quaternion
+q = get_Quaternion(Cb_n_Euler);
+
+
+% Aufgabe 4:Direkt Rotationmatrix aus raw IMU
+phi = 52.385828; %geographische L?nge in degree
+w_e_ref = 7.292115*10^-5; %reference Earth rotation rate in rad/s
+g_n = [0,0,g]';
+wn_ie = w_e_ref*[cosd(phi),0,-sind(phi)]'; %Earth turn rate in rad/s
+Cb_n_direkt = get_Cb_n_direkt(wb_ib_average,fb_ib_average,wn_ie,g_n,Cb_n_Euler); %Direkt DCM von n bis b 
+Cb_n_reort = get_Reorthogonal(Cb_n_direkt); %Reorthogonalization nach Minimierung der Spur
+
+
+
+% Aufgabe 5:Attitude update
+time = [imudata(:,1)-imudata(1,1)]; %Time in s (Anfang von 0) 
+wn_en = [0,0,0]'; %Transportation rate in rad/s
+Cb_n = Cb_n_reort; %Anfangswert
+
+[Cb_n,roll,pitch,yaw] = get_Attitude_update(time,wb_ib,wn_ie,wn_en,Cb_n);%Attitude update
+
+
+figure(1)
+subplot(3,1,1)
+plot(time, roll(:,1))
+ylabel('roll[deg]')
+title('Attitude update via propagation of the DCM')
+xlim([0 600])
+
+subplot(3,1,2)
+plot(time, pitch(:,1))
+ylabel('pitch[deg]')
+xlim([0 600])
+
+subplot(3,1,3)
+plot(time, yaw(:,1))
+ylabel('yaw[deg]')
+xlabel('time[s]')
+xlim([0 600])
 
