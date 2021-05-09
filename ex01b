@@ -83,6 +83,8 @@ xlim([0 600])
 
 
 
+
+%% %%%%Funktionteile %%%%%%%%
 % Aufgabe 1:Intial Alignment - Euler Angels in degree
 function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
   c1 = [1    0          0;
