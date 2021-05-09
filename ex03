@@ -1,1 +1,320 @@
+clc
+clear
+close all
 
+load('ex03_imudata.mat', 'imudata')
+
+static= imudata.static; 
+moving= imudata.moving; 
+
+% Mean of statische rotation rate in rad/s 
+w_x_average = mean(static(:,2));
+w_y_average = mean(static(:,3));
+w_z_average = mean(static(:,4));
+wb_ib_average = [w_x_average;
+                 w_y_average;
+                 w_z_average];
+
+% Mean of statische specific force from the given IMU dataset in m/s^2
+f_x_average= mean(static(:,5));
+f_y_average= mean(static(:,6));
+f_z_average= mean(static(:,7));
+fb_ib_average= [f_x_average;
+                f_y_average;
+                f_z_average];
+
+%Kinematische rotation rate in rad/s 
+w_x= moving(:,2);
+w_y= moving(:,3);
+w_z= moving(:,4);
+wb_ib = [w_x,w_y,w_z]';
+
+%Kinematischespecific force in m/s^2
+f_x= moving(:,5);
+f_y= moving(:,6);
+f_z= moving(:,7);
+fb_ib= [f_x,f_y,f_z]';
+
+
+
+%Aufgabe 1 Initial Alignment & Initialisation
+%a) 
+%integration constants for velocity and position 
+vn_eb = [0,0,0]'; %Anfangsgeschwindigkeit da statische
+xn_eb = [0,0,0]'; %Anfansposition in coordinate center of (n-frame)
+
+w_e= norm(wb_ib_average);  %Earth rotation rate in rad/s
+g= norm(fb_ib_average);
+
+%Latitude
+[roll,pitch,yaw] = get_Eulerwinkel_aus_IMU(wb_ib_average,fb_ib_average); %Eulerwinkel 
+Cb_n_Euler = get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw); %DCM von n bis b aus Eulerwinkel
+Cn_b_Euler = Cb_n_Euler'; %DCM von b bis n aus Eulerwinkel
+wn_ie = Cn_b_Euler * wb_ib_average; 
+phi = -atan2(wn_ie(3,1),wn_ie(1,1))*180/pi %Latitude in degree
+
+
+%b) direct DCM and the initial integration constant for orientation
+g_n = [0,0,g]';
+wn_ie = w_e * [cosd(phi),0, -sind(phi)]'; 
+Cb_n_direkt = get_Cb_n_direkt(wb_ib_average,fb_ib_average,wn_ie,g_n); %direkt DCM von n bis b 
+Cb_n_reort = get_Reorthogonal(Cb_n_direkt); %Reorthogonalization
+Cn_b_reort = Cb_n_reort'; %Reorthogonalization
+
+
+
+
+%Aufgabe 2: Strapdown Algorithm
+time = moving(:,1)-moving(1,1); %moving time in s (Anfang von 0)
+fs = 200; %IMU Datarate [HZ] 
+Cb_n = Cb_n_reort;
+[Eulerwinkel,v,x,w] = get_Update(time,fs,wb_ib,fb_ib,Cb_n,vn_eb,xn_eb,wn_ie,phi,g_n);%Update
+slope = max(Eulerwinkel(2,:));
+
+
+
+
+%Aufgabe 3: Performance Analysis
+b_g = 0.75/3600*pi/180; %Bias for the gyro in rad/s 
+b_a = 1.5*10^(-3)*g; %Bias for the accelerometer in m/s^2
+
+%Position and Velocity errors caused by gyro
+delta_v_gyro = 1/2 * b_g * g * time.^2;
+delta_x_gyro = 1/6 * b_g * g * time.^3;
+
+%Position and Velocity errors caused by accleometer
+delta_v_accelometer = b_a*time;
+delta_x_accelometer = 1/2 * b_a * time.^2;
+
+figure(4)
+subplot(2,1,1)
+plot(time,delta_v_gyro)
+ylabel('delta V gyro [m/s]')
+title('Velocity errors')
+subplot(2,1,2)
+plot(time, delta_v_accelometer)
+ylabel('delta V accelometer [m/s]')
+xlabel('time [s]')
+
+figure(5)
+subplot(2,1,1)
+plot(time,delta_x_gyro)
+ylabel('delta X gyro [m]')
+title('Position errors')
+subplot(2,1,2)
+plot(time, delta_x_accelometer)
+ylabel('delta X accelometer [m]')
+xlabel('time [s]')
+
+
+%Aufgabe 4: 
+fs_neu = 20; %IMU Datarate [HZ]
+[Eulerwinkel_low,v_low,x_low,w_low] = get_Update(time,fs_neu,wb_ib,fb_ib,Cb_n,vn_eb,xn_eb,wn_ie,phi,g_n);%update
+
+ 
+
+%Aufgabe 5:
+figure
+subplot(3,1,1)
+plot(time,w(1,:)')
+ylabel('W_N [rad/s]')
+title('Transportation rate update ')
+subplot(3,1,2)
+plot(time, w(2,:)')
+ylabel('W_E [rad/s]]')
+subplot(3,1,3)
+plot(time, w(3,:)')
+ylabel('W_U [rad/s]')
+xlabel('time [s]')
+
+
+%% %%Funktionteile%%%%
+
+%Direkt Rotationmatrix aus raw IMU
+function Cb_n_direkt=get_Cb_n_direkt(wb_ib,fb_ib,wn_ie,g_n)
+  A1 = [fb_ib, wb_ib, cross(fb_ib,wb_ib)]; %eqution link
+  B1 = [-g_n,  wn_ie, cross(-g_n,wn_ie)]; %eqution right
+  Cb_n_direkt = A1*(B1)^(-1); %Direkt DCM von n bis b 
+end
+
+
+%Intial Alignment - Euler Angels in degree
+function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
+  c1 = [1    0          0;
+        0  cosd(roll) sind(roll);
+        0  -sind(roll)  cosd(roll)];
+
+  c2 = [cosd(pitch)       0      -sind(pitch);
+        0               1         0;   
+        sind(pitch)      0      cosd(pitch)]; 
+  
+  c3 = [cosd(yaw)  sind(yaw)  0;
+        -sind(yaw)  cosd(yaw)   0; 
+        0          0         1]; 
+
+  Cb_n_Euler = c1 *c2 *c3; % Geamte Rotationmatrix von n bis b aus Eulerwinkel
+end
+
+
+%Euler Angels in degree aus DCM von n bis b 
+function Eulerwinkel = get_Eulerwinkel_aus_Cb_n(Cb_n)
+  %Euler Angels in degree
+  %DCM von n bis b 
+  roll = atan2(Cb_n(2,3),Cb_n(3,3))*180/pi;
+  pitch = -atan2(Cb_n(1,3),sqrt(1-Cb_n(1,3)^2))*180/pi;
+  yaw = atan2(Cb_n(1,2),Cb_n(1,1))*180/pi;
+  Eulerwinkel = [roll;
+                 pitch;
+                 yaw];
+end
+
+
+% Euler Angels in degree aus statisch IMU
+function [roll,pitch,yaw]=get_Eulerwinkel_aus_IMU(wb_ib_average,fb_ib_average)
+  w_x = wb_ib_average(1,1);
+  w_y = wb_ib_average(2,1);
+  w_z = wb_ib_average(3,1);
+
+  f_x = fb_ib_average(1,1);
+  f_y = fb_ib_average(2,1);
+  f_z = fb_ib_average(3,1);
+
+  roll = atan2(-f_y,-f_z)*180/pi;
+  pitch = atand(f_x/sqrt(f_y^2 + f_z^2));
+
+  sin_yaw = -w_y*cosd(roll) + w_z*sind(roll);
+  cos_yaw = w_x*cosd(roll) + w_y*sind(roll)*sind(pitch) + w_z*cosd(roll)*sind(pitch);
+  yaw = atan2(sin_yaw,cos_yaw)*180/pi;
+end
+
+
+%Reorthogonalization nach  Minimierung der Spur
+function Cb_n_reort=get_Reorthogonal(Cb_n_direkt)
+  if Cb_n_direkt*Cb_n_direkt' == eye %Check orthogonal
+      Cb_n_reort=Cb_n_direkt;
+  else
+      %Reorthogonalization
+      Cb_n_reort = Cb_n_direkt*(Cb_n_direkt'*Cb_n_direkt)^(-0.5); %nach  Minimierung der Spur
+  end
+end
+
+
+% Bescleunigung
+function an_eb = get_Beschleunigung(Cn_b,fb_ib,vn_eb,wn_ie,wn_en,g_n)
+  an_eb = Cn_b*fb_ib - cross(2*wn_ie+wn_en,vn_eb) + g_n;
+end
+
+
+% wn_en
+function wn_en = get_wn_en(vn_eb,phi)
+
+  vn_eb_N = vn_eb (1,1); 
+  vn_eb_E = vn_eb (2,1); 
+  
+  R_E = 6378000; %Earth radius
+  R_N = 6378000; %Earth radius
+  h = 70; %ellipsoidic heigh
+  wn_en = [vn_eb_E/(R_E+h);
+          -vn_eb_N/(R_N+h);
+          -vn_eb_E*tand(phi)/(R_E+h)];  %Transportation rate in rad/s
+end
+
+
+
+% Aufgabe 2: Attitude,velocity and  position  update
+function [Eulerwinkel,v,x,w] = get_Update(time,fs,wb_ib,fb_ib,Cb_n,vn_eb,xn_eb,wn_ie,phi,g_n)
+
+k = 200/fs; %Intervall
+
+%Anfangswert
+Eulerwinkel = get_Eulerwinkel_aus_Cb_n(Cb_n);
+j = 1;
+v(:,j) = vn_eb;
+v_magnitude(:,j) = norm(vn_eb);
+x(:,j) = xn_eb;
+wn_en = get_wn_en(vn_eb,phi); %Transportation rate 
+w(:,j) = wn_en ;
+
+for i= 1:k:length(time)-k
+   
+    %Attitude update
+    delta_t = time(i+k,:)-time(i,:); 
+    wb_nb = wb_ib(:,i) - Cb_n * (wn_ie + wn_en); %Correction in rad/s
+    omega_b_nb= [   0         -wb_nb(3,1)    wb_nb(2,1)
+                  wb_nb(3,1)        0       -wb_nb(1,1)
+                 -wb_nb(2,1)   wb_nb(1,1)        0 ];
+    Y = omega_b_nb*delta_t;
+    delta = norm(wb_nb*delta_t); %Winkel in rad
+    
+    %Closed form solution
+    Cn_b = Cb_n';
+   % Cn_b_neu =  Cn_b + Cn_b*omega_b_nb*delta_t;
+    Cn_b_neu = Cn_b*(eye(3) + sin(delta)/delta * Y + (1-cos(delta))/delta^2 * Y^2 );   
+    Cn_b_neu = Cn_b_neu * (Cn_b_neu'*Cn_b_neu)^(-0.5); %Reorthogonalization
+    
+    
+    %Velocity and  position  update
+    an_eb = get_Beschleunigung(Cn_b,fb_ib(:,i),vn_eb,wn_ie,wn_en,g_n);
+    an_eb_neu = get_Beschleunigung(Cn_b_neu,fb_ib(:,i+k),vn_eb,wn_ie,wn_en,g_n);
+   vn_eb_neu = vn_eb+ delta_t*(an_eb);
+    %vn_eb_neu = vn_eb+ delta_t/2*(an_eb+an_eb_neu);
+    xn_eb_neu = xn_eb+ delta_t/2*(vn_eb+vn_eb_neu);
+    
+    %Transportation rate  update
+    wn_en_neu = get_wn_en(vn_eb_neu,phi);
+    
+    %new value
+    Cb_n_neu = Cn_b_neu';
+    Eulerwinkel(:,j+1) = get_Eulerwinkel_aus_Cb_n(Cb_n_neu);
+    v(:,j+1) = vn_eb_neu;
+    x(:,j+1) = xn_eb_neu;
+    w(:,j+1) = wn_en_neu ;
+    v_magnitude(:,j+1) = norm(vn_eb_neu);
+    
+    j = j+1;
+    
+    Cb_n = Cb_n_neu;
+    vn_eb = vn_eb_neu;
+    xn_eb = xn_eb_neu;
+    wn_en = wn_en_neu;
+end
+
+% plot
+time_neu = time(1:k:length(time));
+
+figure
+subplot(3,1,1)
+plot(time_neu, Eulerwinkel(1,:)')
+ylabel('roll[deg]')
+title('Attitude update via propagation of the DCM')
+subplot(3,1,2)
+plot(time_neu, Eulerwinkel(2,:)')
+ylabel('pitch[deg]')
+subplot(3,1,3)
+plot(time_neu, Eulerwinkel(3,:)')
+ylabel('yaw[deg]')
+xlabel('time[s]')
+
+figure
+subplot(4,1,1)
+plot(time_neu,v(1,:)')
+ylabel('V_N [m/s]')
+title('Velocity update via propagation of the DCM')
+subplot(4,1,2)
+plot(time_neu, v(2,:)')
+ylabel('V_E [m/s]]')
+subplot(4,1,3)
+plot(time_neu, v(3,:)')
+ylabel('V_U [m/s]')
+subplot(4,1,4)
+plot(time_neu, v_magnitude(1,:)')
+ylabel('V_magnitude [m/s]')
+xlabel('time [s]')
+
+figure
+plot(x(2,:), x(1,:))
+xlabel('X_E [m]')
+ylabel('X_N [m]')
+title('the trajectory of the vehicle on the tangential plane')
+
+end
