@@ -81,3 +81,26 @@ ylabel('yaw[deg]')
 xlabel('time[s]')
 xlim([0 600])
 
+
+% Aufgabe 1:Intial Alignment - Euler Angels in degree
+function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
+
+c1 = [1    0          0;
+      0  cosd(roll) -sind(roll);
+      0  sind(roll)  cosd(roll)];
+
+c2 = [cosd(pitch)       0      sind(pitch);
+        0               1         0;   
+      -sind(pitch)      0      cosd(pitch)]; 
+  
+c3 = [cosd(yaw)  -sind(yaw)  0;
+      sind(yaw)  cosd(yaw)   0; 
+        0          0         1]; 
+    
+Cb_n_Euler = c1*c2*c3; % Geamte Rotationmatrix von n bis b aus Eulerwinkel
+
+end
+
+
+
+
