@@ -82,25 +82,112 @@ xlabel('time[s]')
 xlim([0 600])
 
 
+
 % Aufgabe 1:Intial Alignment - Euler Angels in degree
 function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
+  c1 = [1    0          0;
+        0  cosd(roll) -sind(roll);
+        0  sind(roll)  cosd(roll)];
 
-c1 = [1    0          0;
-      0  cosd(roll) -sind(roll);
-      0  sind(roll)  cosd(roll)];
-
-c2 = [cosd(pitch)       0      sind(pitch);
+  c2 = [cosd(pitch)       0      sind(pitch);
         0               1         0;   
-      -sind(pitch)      0      cosd(pitch)]; 
+        -sind(pitch)      0      cosd(pitch)]; 
   
-c3 = [cosd(yaw)  -sind(yaw)  0;
-      sind(yaw)  cosd(yaw)   0; 
+  c3 = [cosd(yaw)  -sind(yaw)  0;
+        sind(yaw)  cosd(yaw)   0; 
         0          0         1]; 
     
-Cb_n_Euler = c1*c2*c3; % Geamte Rotationmatrix von n bis b aus Eulerwinkel
-
+  Cb_n_Euler = c1*c2*c3; % Geamte Rotationmatrix von n bis b aus Eulerwinkel
 end
 
 
+%Aufgabe 2: Rotation Vector
+function [u,rotation_angel]=get_Rotationsvector(Cb_n_Euler)
+  tr = trace(Cb_n_Euler); %Trace of the matrix
+  rotation_angel = acosd((tr-1)/2); %Rotation angel from the Trace of the matrix in degree
+  h = [Cb_n_Euler(3,2)-Cb_n_Euler(2,3);
+       Cb_n_Euler(1,3)-Cb_n_Euler(3,1);
+       Cb_n_Euler(2,1)-Cb_n_Euler(1,2)];
+  u = h/norm(h); %Eigenvector for eigenvalue =1 of matrix Cb_n
+end
+
+
+%Direkt Rotationmatrix aus raw IMU
+function Cb_n_direkt=get_Cb_n_direkt(wb_ib,fb_ib,wn_ie,g_n,Cb_n_Euler)
+  A1 = [fb_ib, wb_ib, cross(fb_ib,wb_ib)]; %eqution link
+  B1 = [-g_n,  wn_ie, cross(-g_n,wn_ie)]; %eqution right
+  Cb_n_direkt = A1*(B1)^(-1); %Direkt DCM von n bis b 
+  if Cb_n_direkt == Cb_n_Euler %Check wether same
+   fprintf('it is same as the matrix with the DCM calculated in part A\n')
+  else
+   fprintf('it is not same as the matrix with the DCM calculated in part A\n')
+  end
+end
+
+
+%Euler Angels in degree aus DCM von n bis b 
+function [roll,pitch,yaw] = get_Eulerwinkel_aus_Cb_n(Cb_n)
+  %Euler Angels in degree
+  %DCM von n bis b 
+  roll = -[atan2(Cb_n(2,3),Cb_n(3,3))]*180/pi;
+  pitch = [atan2(Cb_n(1,3),sqrt(1-Cb_n(1,3)^2))]*180/pi;
+  yaw = -[atan2(Cb_n(1,2),Cb_n(1,1))]*180/pi;
+end
+
+
+%Aufgabe 3: Quaternion
+function q=get_Quaternion(Cb_n_Euler)
+  tr = trace(Cb_n_Euler); %Trace of the matrix
+  a = 0.5*sqrt(1+tr);
+  b = 1/(4*a)*(Cb_n_Euler(3,2)-Cb_n_Euler(2,3));
+  c = 1/(4*a)*(Cb_n_Euler(1,3)-Cb_n_Euler(3,1));
+  d = 1/(4*a)*(Cb_n_Euler(2,1)-Cb_n_Euler(1,2));
+  q=[ a;
+      b;
+      c;
+      d];
+end
+
+
+%Aufgabe 4:Reorthogonalization
+function Cb_n_reort=get_Reorthogonal(Cb_n_direkt)
+
+  if Cb_n_direkt*Cb_n_direkt' == eye %Check orthogonal
+    fprintf('it is still orthogonal\n')
+    Cb_n_reort=Cb_n_direkt;
+  else
+    fprintf('it is not orthogonal any more\n')
+    %Reorthogonalization
+    Cb_n_reort = Cb_n_direkt*(Cb_n_direkt'*Cb_n_direkt)^(-0.5); %nach  Minimierung der Spur
+  end
+end
+
+
+% Attitude update
+function [Cb_n,roll,pitch,yaw] = get_Attitude_update(time,wb_ib,wn_ie,wn_en,Cb_n)
+  %Anfangswert
+  [roll,pitch,yaw] = get_Eulerwinkel_aus_Cb_n(Cb_n);
+  for i= 1:length(time)-1    
+    delta_t = time(i+1,:)-time(i,:); 
+    wb_nb = wb_ib(:,i) - Cb_n * (wn_ie + wn_en); %Correction in rad/s
+    omega_b_nb= [   0         -wb_nb(3,1)    wb_nb(2,1)
+                  wb_nb(3,1)        0       -wb_nb(1,1)
+                 -wb_nb(2,1)   wb_nb(1,1)        0 ];
+    Y = omega_b_nb*delta_t;
+    delta = norm(wb_nb*delta_t); %Winkel in rad
+   
+    %Closed form solution 
+    Cn_b = Cb_n';
+    Cn_b_neu = Cn_b*(eye(3) + sin(delta)/delta * Y + (1-cos(delta))/delta^2 * Y^2 ); 
+    
+    %Reorthogonalization
+    Cn_b_neu = Cn_b_neu * (Cn_b_neu'*Cn_b_neu)^(-0.5); 
+    Cb_n_neu = Cn_b_neu';
+   
+    %new Euler Angels in degree
+    [roll(i+1,:),pitch(i+1,:),yaw(i+1,:)] = get_Eulerwinkel_aus_Cb_n(Cb_n_neu);
+    Cb_n= Cb_n_neu;  
+  end
+end
 
 
