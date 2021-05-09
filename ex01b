@@ -85,7 +85,7 @@ xlim([0 600])
 
 
 %% %%%%Funktionteile %%%%%%%%
-% Aufgabe 1:Intial Alignment - Euler Angels in degree
+%% Aufgabe 1:Intial Alignment - Euler Angels in degree
 function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
   c1 = [1    0          0;
         0  cosd(roll) -sind(roll);
@@ -103,7 +103,7 @@ function Cb_n_Euler=get_Cb_n_aus_Eulerwinkel(roll,pitch,yaw)
 end
 
 
-%Aufgabe 2: Rotation Vector
+%% Aufgabe 2: Rotation Vector
 function [u,rotation_angel]=get_Rotationsvector(Cb_n_Euler)
   tr = trace(Cb_n_Euler); %Trace of the matrix
   rotation_angel = acosd((tr-1)/2); %Rotation angel from the Trace of the matrix in degree
@@ -114,7 +114,7 @@ function [u,rotation_angel]=get_Rotationsvector(Cb_n_Euler)
 end
 
 
-%Direkt Rotationmatrix aus raw IMU
+%% Direkt Rotationmatrix aus raw IMU
 function Cb_n_direkt=get_Cb_n_direkt(wb_ib,fb_ib,wn_ie,g_n,Cb_n_Euler)
   A1 = [fb_ib, wb_ib, cross(fb_ib,wb_ib)]; %eqution link
   B1 = [-g_n,  wn_ie, cross(-g_n,wn_ie)]; %eqution right
@@ -127,7 +127,7 @@ function Cb_n_direkt=get_Cb_n_direkt(wb_ib,fb_ib,wn_ie,g_n,Cb_n_Euler)
 end
 
 
-%Euler Angels in degree aus DCM von n bis b 
+%% Euler Angels in degree aus DCM von n bis b 
 function [roll,pitch,yaw] = get_Eulerwinkel_aus_Cb_n(Cb_n)
   %Euler Angels in degree
   %DCM von n bis b 
@@ -137,7 +137,7 @@ function [roll,pitch,yaw] = get_Eulerwinkel_aus_Cb_n(Cb_n)
 end
 
 
-%Aufgabe 3: Quaternion
+%% Aufgabe 3: Quaternion
 function q=get_Quaternion(Cb_n_Euler)
   tr = trace(Cb_n_Euler); %Trace of the matrix
   a = 0.5*sqrt(1+tr);
@@ -151,7 +151,7 @@ function q=get_Quaternion(Cb_n_Euler)
 end
 
 
-%Aufgabe 4:Reorthogonalization
+%% Aufgabe 4:Reorthogonalization
 function Cb_n_reort=get_Reorthogonal(Cb_n_direkt)
 
   if Cb_n_direkt*Cb_n_direkt' == eye %Check orthogonal
@@ -165,7 +165,7 @@ function Cb_n_reort=get_Reorthogonal(Cb_n_direkt)
 end
 
 
-% Attitude update
+%% Attitude update
 function [Cb_n,roll,pitch,yaw] = get_Attitude_update(time,wb_ib,wn_ie,wn_en,Cb_n)
   %Anfangswert
   [roll,pitch,yaw] = get_Eulerwinkel_aus_Cb_n(Cb_n);
